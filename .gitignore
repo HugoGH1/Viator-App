@@ -1,0 +1,7 @@
+# Variables de entorno
+.env
+.env.local
+.env.production
+
+# Docker volumes locales
+**/postgres_data/

@@ -1,0 +1,124 @@
+# =============================================================================
+# ViatorBK - Docker Compose Unificado
+# Levanta ambas APIs y sus respectivas bases de datos con un solo comando:
+#   docker compose up --build
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Base de datos para el proyecto NestJS (viator)
+  # Puerto externo: 3307
+  # ---------------------------------------------------------------------------
+  viator-mysql:
+    image: mysql:8.0
+    container_name: viator_nestjs_db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: viator_db
+      MYSQL_USER: viator_user
+      MYSQL_PASSWORD: viator_password
+      MYSQL_ROOT_PASSWORD: viator_root_password
+    ports:
+      - "3307:3306"
+    volumes:
+      # Usamos el mismo directorio de tu proyecto para no perder datos
+      - ./viator/mysql_data:/var/lib/mysql
+    networks:
+      - viator-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pviator_root_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # Base de datos para el proyecto .NET (viatorAPI)
+  # Puerto externo: 5434
+  # ---------------------------------------------------------------------------
+  viatorapi-postgres:
+    image: postgres:15-alpine
+    container_name: viator_dotnet_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: viator_db
+      POSTGRES_USER: viator_user
+      POSTGRES_PASSWORD: viator_password
+    ports:
+      - "5434:5432"
+    volumes:
+      # Usamos el volumen nombrado existente de tu proyecto .NET
+      - viatorapi_postgres_data:/var/lib/postgresql/data
+    networks:
+      - viator-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U viator_user -d viator_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # API NestJS (viator) - Puerto 3000
+  # ---------------------------------------------------------------------------
+  viator-api:
+    build:
+      context: ./viator
+      dockerfile: Dockerfile
+    container_name: viator_nestjs_api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "mysql://viator_user:viator_password@viator-mysql:3306/viator_db"
+      DB_HOST: viator-mysql
+      DB_PORT: "3306"
+      DB_USER: viator_user
+      DB_PASSWORD: viator_password
+      DB_NAME: viator_db
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
+      NODE_ENV: ${NODE_ENV:-development}
+    depends_on:
+      viator-mysql:
+        condition: service_healthy
+    networks:
+      - viator-network
+
+  # ---------------------------------------------------------------------------
+  # API .NET (viatorAPI) - Puertos 8080 / 8081
+  # ---------------------------------------------------------------------------
+  viatorapi-api:
+    build:
+      context: ./viatorAPI
+      dockerfile: Dockerfile
+    container_name: viator_dotnet_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__PostgresConnection: "Host=viatorapi-postgres;Port=5432;Database=viator_db;Username=viator_user;Password=viator_password"
+    depends_on:
+      viatorapi-postgres:
+        condition: service_healthy
+    networks:
+      - viator-network
+
+# =============================================================================
+# Volúmenes nombrados - persisten datos aunque los contenedores se eliminen
+# =============================================================================
+volumes:
+  # Referenciamos al volumen que ya existe para no perder la base de datos de .NET
+  viatorapi_postgres_data:
+    external: true
+
+# =============================================================================
+# Red compartida para comunicación entre servicios
+# =============================================================================
+networks:
+  viator-network:
+    driver: bridge
+    name: viator_network
