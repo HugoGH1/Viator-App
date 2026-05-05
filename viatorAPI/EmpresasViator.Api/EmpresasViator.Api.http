@@ -1,0 +1,6 @@
+@EmpresasViator.Api_HostAddress = http://localhost:5216
+
+GET {{EmpresasViator.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

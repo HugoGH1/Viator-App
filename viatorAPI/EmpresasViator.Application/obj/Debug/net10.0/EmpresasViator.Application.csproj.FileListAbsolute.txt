@@ -1,0 +1,16 @@
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\bin\Debug\net10.0\EmpresasViator.Application.deps.json
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\bin\Debug\net10.0\EmpresasViator.Application.dll
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\bin\Debug\net10.0\EmpresasViator.Application.pdb
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\bin\Debug\net10.0\EmpresasViator.Domain.dll
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\bin\Debug\net10.0\EmpresasViator.Domain.pdb
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\obj\Debug\net10.0\EmpresasViator.Application.csproj.AssemblyReference.cache
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\obj\Debug\net10.0\EmpresasViator.Application.GeneratedMSBuildEditorConfig.editorconfig
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\obj\Debug\net10.0\EmpresasViator.Application.AssemblyInfoInputs.cache
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\obj\Debug\net10.0\EmpresasViator.Application.AssemblyInfo.cs
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\obj\Debug\net10.0\EmpresasViator.Application.csproj.CoreCompileInputs.cache
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\obj\Debug\net10.0\Empresas.F58CBFDA.Up2Date
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\obj\Debug\net10.0\EmpresasViator.Application.dll
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\obj\Debug\net10.0\refint\EmpresasViator.Application.dll
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\obj\Debug\net10.0\EmpresasViator.Application.pdb
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\obj\Debug\net10.0\ref\EmpresasViator.Application.dll
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Application\obj\Debug\net10.0\EmpresasViator.Application.sourcelink.json

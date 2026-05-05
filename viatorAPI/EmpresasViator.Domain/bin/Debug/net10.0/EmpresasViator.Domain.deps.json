@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "EmpresasViator.Domain/1.0.0": {
+        "runtime": {
+          "EmpresasViator.Domain.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "EmpresasViator.Domain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

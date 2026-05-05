@@ -1,0 +1,12 @@
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Domain\bin\Debug\net10.0\EmpresasViator.Domain.deps.json
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Domain\bin\Debug\net10.0\EmpresasViator.Domain.dll
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Domain\bin\Debug\net10.0\EmpresasViator.Domain.pdb
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Domain\obj\Debug\net10.0\EmpresasViator.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Domain\obj\Debug\net10.0\EmpresasViator.Domain.AssemblyInfoInputs.cache
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Domain\obj\Debug\net10.0\EmpresasViator.Domain.AssemblyInfo.cs
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Domain\obj\Debug\net10.0\EmpresasViator.Domain.csproj.CoreCompileInputs.cache
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Domain\obj\Debug\net10.0\EmpresasViator.Domain.dll
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Domain\obj\Debug\net10.0\refint\EmpresasViator.Domain.dll
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Domain\obj\Debug\net10.0\EmpresasViator.Domain.pdb
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Domain\obj\Debug\net10.0\ref\EmpresasViator.Domain.dll
+C:\Proyectos\ViatorBK\viatorAPI\EmpresasViator.Domain\obj\Debug\net10.0\EmpresasViator.Domain.sourcelink.json

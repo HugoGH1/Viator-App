@@ -1,0 +1,14 @@
+# Carpetas de build locales (se compilan dentro del contenedor)
+**/bin/
+**/obj/
+
+# Git
+.git
+.gitignore
+
+# Tests (no se incluyen en la imagen de producción)
+EmpresasViator.Tests/
+
+# Archivos de configuración local
+*.user
+.vs/

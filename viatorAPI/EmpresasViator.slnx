@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="EmpresasViator.Api/EmpresasViator.Api.csproj" />
+  <Project Path="EmpresasViator.Application/EmpresasViator.Application.csproj" />
+  <Project Path="EmpresasViator.Domain/EmpresasViator.Domain.csproj" />
+  <Project Path="EmpresasViator.Infrastructure/EmpresasViator.Infrastructure.csproj" />
+  <Project Path="EmpresasViator.Tests/EmpresasViator.Tests.csproj" />
+</Solution>
