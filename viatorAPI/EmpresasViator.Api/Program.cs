@@ -32,7 +32,7 @@ builder.Services.AddScoped<IUpdateEventoUseCase, UpdateEventoUseCase>();
 builder.Services.AddScoped<IDeleteEventoUseCase, DeleteEventoUseCase>();
 // Base de Datos
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("PostgresConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("SqlServerConnection")));
 
 builder.Services.AddCors(options =>
 {
