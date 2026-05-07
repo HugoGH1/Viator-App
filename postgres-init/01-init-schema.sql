@@ -1,0 +1,28 @@
+CREATE TYPE "Role" AS ENUM (
+  'USER',
+  'ADMIN',
+  'SUPER_ADMIN'
+);
+
+CREATE TABLE "User" (
+  "id" TEXT PRIMARY KEY,
+  "email" TEXT NOT NULL UNIQUE,
+  "passwordHash" TEXT NOT NULL,
+  "name" TEXT NOT NULL,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "role" "Role" NOT NULL DEFAULT 'USER'
+);
+
+CREATE TABLE "Session" (
+  "id" TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "expiresAt" TIMESTAMP NOT NULL,
+  "tokenHash" TEXT NOT NULL UNIQUE,
+
+  CONSTRAINT "Session_userId_fkey"
+    FOREIGN KEY ("userId")
+    REFERENCES "User"("id")
+    ON DELETE CASCADE
+);

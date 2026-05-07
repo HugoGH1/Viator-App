@@ -2,6 +2,10 @@
 # ViatorBK - Docker Compose Unificado
 # Levanta ambas APIs y sus respectivas bases de datos con un solo comando:
 #   docker compose up --build
+#  Primera vez: docker compose up --build
+#  Para reinicio limpio docker compose down -v
+#  Para detener: docker compose stop
+#  Para eliminar: docker compose down
 # =============================================================================
 
 services:
@@ -23,15 +27,68 @@ services:
       - "3307:3306"
     volumes:
       # Usamos el mismo directorio de tu proyecto para no perder datos
-      - ./viator/mysql_data:/var/lib/mysql
+      - viator_mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
     networks:
       - viator-network
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pviator_root_password"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
       start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL - Réplica de solo lectura (CQRS Read Side)
+  # Sincronizada desde MySQL vía SymmetricDS
+  # Puerto externo: 5433
+  # ---------------------------------------------------------------------------
+  viator-postgres-read:
+    image: postgres:16-alpine
+    container_name: viator_read_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: viator_read_db
+      POSTGRES_USER: viator_read_user
+      POSTGRES_PASSWORD: viator_read_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - viator_postgres_read_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
+    networks:
+      - viator-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U viator_read_user -d viator_read_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # SymmetricDS - Motor de replicación MySQL → PostgreSQL
+  # Sincroniza cambios en near real-time (~5 segundos)
+  # ---------------------------------------------------------------------------
+  viator-symmetricds:
+    build:
+      context: ./symmetricds
+      dockerfile: Dockerfile
+    container_name: viator_symmetricds
+    restart: unless-stopped
+    depends_on:
+      viator-mysql:
+        condition: service_healthy
+      viator-postgres-read:
+        condition: service_healthy
+      viator-symmetricds:
+        condition: service_healthy
+    networks:
+      - viator-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:31415"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
 
   # ---------------------------------------------------------------------------
   # Base de datos para el proyecto .NET (viatorAPI)
@@ -75,10 +132,19 @@ services:
       DB_USER: viator_user
       DB_PASSWORD: viator_password
       DB_NAME: viator_db
+      # PostgreSQL Read Replica
+      READ_DATABASE_URL: "postgresql://viator_read_user:viator_read_password@viator-postgres-read:5432/viator_read_db"
+      READ_DB_HOST: viator-postgres-read
+      READ_DB_PORT: "5432"
+      READ_DB_USER: viator_read_user
+      READ_DB_PASSWORD: viator_read_password
+      READ_DB_NAME: viator_read_db
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
       NODE_ENV: ${NODE_ENV:-development}
     depends_on:
       viator-mysql:
+        condition: service_healthy
+      viator-postgres-read:
         condition: service_healthy
     networks:
       - viator-network
@@ -109,7 +175,9 @@ services:
 # Volúmenes nombrados - persisten datos aunque los contenedores se eliminen
 # =============================================================================
 volumes:
+  viator_mysql_data:
   viatorapi_sqlserver_data:
+  viator_postgres_read_data:
 
 # =============================================================================
 # Red compartida para comunicación entre servicios
