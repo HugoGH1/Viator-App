@@ -12,125 +12,104 @@ MYSQL_PASSWORD="viator_root_password"
 
 MYSQL_CMD="mysql --skip-ssl -h $MYSQL_HOST -u $MYSQL_USER -p$MYSQL_PASSWORD"
 
+SYM_HOME="/opt/symmetric-ds"
+CONFIG_SQL="$SYM_HOME/init/init-config.sql"
+
 # -------------------------------------------------------------------
-# Esperar MySQL
+# 1. Esperar MySQL
 # -------------------------------------------------------------------
 wait_for_mysql() {
-
-  echo "[init] Esperando MySQL..."
-
-  local retries=30
-
+  echo "[1/6] Esperando MySQL..."
+  local retries=60
   while [ $retries -gt 0 ]; do
-
-    if $MYSQL_CMD -D "$MYSQL_DB" -e "SELECT 1"; then
-      echo "[init] MySQL listo."
+    if $MYSQL_CMD -D "$MYSQL_DB" -e "SELECT 1" > /dev/null 2>&1; then
+      echo "  MySQL listo."
       return 0
     fi
-
     retries=$((retries - 1))
-
-    echo "[init] MySQL no disponible... ($retries restantes)"
+    echo "  MySQL no disponible... ($retries restantes)"
     sleep 3
   done
-
-  echo "[error] MySQL no respondió."
+  echo "[error] MySQL no respondio."
   exit 1
 }
 
 # -------------------------------------------------------------------
-# Esperar PostgreSQL replica
+# 2. Esperar PostgreSQL replica
 # -------------------------------------------------------------------
 wait_for_postgres() {
-
-  echo "[init] Esperando PostgreSQL replica..."
-
-  local retries=30
-
+  echo "[2/6] Esperando PostgreSQL replica..."
+  local retries=60
   while [ $retries -gt 0 ]; do
-
-    if nc -z viator-postgres-read 5432 >/dev/null 2>&1; then
-      echo "[init] PostgreSQL replica listo."
+    if nc -z viator-postgres-read 5432 > /dev/null 2>&1; then
+      echo "  PostgreSQL replica listo."
       return 0
     fi
-
     retries=$((retries - 1))
-
-    echo "[init] PostgreSQL no disponible... ($retries restantes)"
+    echo "  PostgreSQL no disponible... ($retries restantes)"
     sleep 3
   done
-
-  echo "[error] PostgreSQL replica no respondió."
+  echo "[error] PostgreSQL replica no respondio."
   exit 1
 }
 
 # -------------------------------------------------------------------
-# Esperar tablas internas SymmetricDS
-# -------------------------------------------------------------------
-wait_for_sym_tables() {
-
-  echo "[init] Esperando tablas SymmetricDS..."
-
-  local retries=40
-
-  while [ $retries -gt 0 ]; do
-
-    result=$(
-      $MYSQL_CMD "$MYSQL_DB" -N -e "
-        SELECT COUNT(*)
-        FROM information_schema.tables
-        WHERE table_schema='$MYSQL_DB'
-        AND table_name='sym_node_group';
-      " 2>/dev/null || echo "0"
-    )
-
-    if [ "$result" = "1" ]; then
-      echo "[init] Tablas SymmetricDS detectadas."
-      return 0
-    fi
-
-    retries=$((retries - 1))
-
-    echo "[init] Tablas aún no creadas... ($retries restantes)"
-    sleep 5
-  done
-
-  echo "[error] SymmetricDS no creó tablas."
-  exit 1
-}
-
-# -------------------------------------------------------------------
-# 1. Esperar infraestructura
+# 3. Esperar infraestructura
 # -------------------------------------------------------------------
 wait_for_mysql
 wait_for_postgres
 
 # -------------------------------------------------------------------
-# 2. Iniciar SymmetricDS
+# 4. Iniciar SymmetricDS como proceso UNICO (foreground)
+#    Carga TODOS los engines de /opt/symmetric-ds/engines/
+#    Lo lanzamos en background para poder seguir con el script
 # -------------------------------------------------------------------
-echo "[init] Iniciando SymmetricDS..."
+echo "[3/6] Iniciando SymmetricDS (proceso unico multi-engine)..."
 
-/opt/symmetric-ds/bin/sym \
-  --port 31415 \
-  --no-log-console &
+$SYM_HOME/bin/sym \
+  --port 31415 &
 
 SYM_PID=$!
 
 # -------------------------------------------------------------------
-# 3. Esperar bootstrap interno
+# 5. Esperar a que SymmetricDS termine su bootstrap
+#    Verificamos que la tabla sym_trigger exista en MySQL
+#    Esta es la tabla donde necesitamos insertar la configuracion
 # -------------------------------------------------------------------
-sleep 25
+echo "[4/6] Esperando bootstrap de SymmetricDS en MySQL..."
 
-wait_for_sym_tables
+retries=120
+while [ $retries -gt 0 ]; do
+  # Verificar que sym_trigger existe en MySQL
+  SYM_TRIGGER_EXISTS=$(
+    $MYSQL_CMD "$MYSQL_DB" -N -e "
+      SELECT COUNT(*)
+      FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA='$MYSQL_DB'
+        AND TABLE_NAME = 'sym_trigger';
+    " 2>/dev/null || echo "0"
+  )
+
+  if [ "$SYM_TRIGGER_EXISTS" = "1" ] 2>/dev/null; then
+    echo "  Bootstrap completo - tabla sym_trigger encontrada en MySQL."
+    break
+  fi
+
+  retries=$((retries - 1))
+  echo "  Esperando tabla sym_trigger en MySQL... ($retries restantes)"
+  sleep 5
+done
+
+if [ "$SYM_TRIGGER_EXISTS" != "1" ] 2>/dev/null; then
+  echo "[error] Bootstrap no completo despues de 10 minutos."
+  exit 1
+fi
+
+# Dar un poco mas de tiempo para que terminen de crearse todas las tablas
+sleep 10
 
 # -------------------------------------------------------------------
-# 4. Verificar si YA se aplicó init-config.sql
-#
-# IMPORTANTE:
-# NO validar sym_node_group porque SymmetricDS
-# la crea automáticamente.
-#
-# Validamos un trigger nuestro.
+# 6. Aplicar configuracion inicial SOLO si no existe
 # -------------------------------------------------------------------
 CONFIGURED=$(
   $MYSQL_CMD "$MYSQL_DB" -N -e "
@@ -140,50 +119,52 @@ CONFIGURED=$(
   " 2>/dev/null || echo "0"
 )
 
-# -------------------------------------------------------------------
-# 5. Aplicar configuración inicial SOLO una vez
-# -------------------------------------------------------------------
 if [ "$CONFIGURED" = "0" ]; then
-
-  echo "[init] Aplicando configuración inicial..."
+  echo "[5/6] Aplicando configuracion inicial..."
 
   $MYSQL_CMD "$MYSQL_DB" \
-    < /opt/symmetric-ds/init/init-config.sql
+    < $CONFIG_SQL
 
-  echo "[init] Configuración inicial aplicada."
+  if [ $? -ne 0 ]; then
+    echo "[error] Fallo al aplicar configuracion."
+    exit 1
+  fi
 
+  echo "  Configuracion aplicada correctamente."
+
+  # Esperar a que SymmetricDS procese la configuracion
+  sleep 15
+
+  # Sincronizar triggers en MySQL
+  echo "  Sincronizando triggers..."
+  $SYM_HOME/bin/symadmin \
+    --engine mysql-master \
+    sync-triggers
+
+  # Abrir registro para el nodo replica
+  echo "  Abriendo registro para replica..."
+  $SYM_HOME/bin/symadmin \
+    --engine mysql-master \
+    open-registration replica replica-001
+
+  # Esperar a que el nodo replica se registre
+  echo "  Esperando registro del nodo replica (30s)..."
+  sleep 30
+
+  # Enviar carga inicial
+  echo "  Enviando carga inicial..."
+  $SYM_HOME/bin/symadmin \
+    --engine mysql-master \
+    reload-node replica-001
+
+  echo "  Carga inicial enviada."
 else
-  echo "[init] Configuración ya existente."
+  echo "[5/6] Configuracion ya existente, omitiendo."
 fi
 
-# -------------------------------------------------------------------
-# 6. Sincronizar triggers SIEMPRE
-# -------------------------------------------------------------------
-echo "[init] Sincronizando triggers..."
-
-/opt/symmetric-ds/bin/symadmin \
-  --engine mysql-master \
-  sync-triggers
-
-# -------------------------------------------------------------------
-# 7. Esperar propagación metadata
-# -------------------------------------------------------------------
-echo "[init] Esperando propagación metadata..."
-sleep 20
-
-# -------------------------------------------------------------------
-# 8. Ejecutar initial load
-# -------------------------------------------------------------------
-echo "[init] Ejecutando initial load..."
-
-/opt/symmetric-ds/bin/symadmin \
-  --engine mysql-master \
-  reload-node replica-001 || true
-
-echo "[init] Initial load enviado."
-
+echo "[6/6] SymmetricDS listo y replicando."
 echo "==========================================="
-echo "  SymmetricDS listo"
+echo "  Replicacion MySQL -> PostgreSQL activa"
 echo "==========================================="
 
 # -------------------------------------------------------------------

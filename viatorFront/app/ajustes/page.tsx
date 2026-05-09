@@ -3,37 +3,45 @@
 import { User, Bell, Shield, HelpCircle, LogOut, ChevronRight, MapPin } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
-
-const settingsItems = [
-  {
-    icon: User,
-    label: "Mi perfil",
-    description: "Edita tu información personal",
-  },
-  {
-    icon: Bell,
-    label: "Notificaciones",
-    description: "Configura tus alertas",
-  },
-  {
-    icon: Shield,
-    label: "Privacidad",
-    description: "Ajustes de privacidad y seguridad",
-  },
-  {
-    icon: HelpCircle,
-    label: "Ayuda",
-    description: "Centro de ayuda y soporte",
-  },
-];
+import { useAuth } from "@/components/auth-provider";
+import { authAPI } from "@/lib/auth-api";
+import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 
 export default function SettingsPage() {
+  const { logout, user, token, isLoading: authLoading } = useAuth(); // Hook dentro del componente
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
+
+  if (authLoading || (!user && !authLoading)) return <div className="min-h-screen bg-dark-blue flex items-center justify-center text-light-beige">Cargando sesión...</div>;
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    setIsLoggingOut(true);
+    try {
+      if (token) {
+        await authAPI.logout(token);
+      }
+    } catch (error) {
+      console.error("Error al notificar logout al servidor:", error);
+    } finally {
+      logout();
+      router.push("/login");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-dark-blue">
       <DesktopSidebar />
 
       <main className="pb-20 md:pb-8 md:ml-64">
-        {/* Header */}
         <header className="px-5 pt-6 pb-4 md:px-8 md:pt-8">
           <h1 className="text-xl font-bold text-very-light-beige mb-2 md:text-2xl">
             Ajustes
@@ -52,10 +60,10 @@ export default function SettingsPage() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-very-light-beige">
-                  Usuario Invitado
+                  {user?.name || "Usuario Invitado"}
                 </h2>
                 <p className="text-light-beige text-sm">
-                  invitado@turismomx.com
+                  {user?.email || "invitado@turismomx.com"}
                 </p>
               </div>
             </div>
@@ -85,11 +93,18 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Logout */}
+        {/* Logout Button - Vinculado a handleLogout */}
         <section className="px-5 md:px-8 mt-6">
-          <button className="w-full flex items-center justify-center gap-2 py-4 bg-medium-blue rounded-2xl text-light-beige hover:bg-medium-blue-accent transition-colors">
+          <button
+            className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-light-beige transition-colors ${isLoggingOut ? 'bg-medium-blue/50' : 'bg-medium-blue hover:bg-medium-blue-accent'
+              }`}
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+          >
             <LogOut className="h-5 w-5" />
-            <span className="font-medium">Cerrar sesión</span>
+            <span className="font-medium">
+              {isLoggingOut ? "Cerrando sesión..." : "Cerrar sesión"}
+            </span>
           </button>
         </section>
 
@@ -97,10 +112,10 @@ export default function SettingsPage() {
         <footer className="px-5 md:px-8 mt-8 text-center">
           <div className="flex items-center justify-center gap-2 text-light-beige/60 mb-2">
             <MapPin className="h-4 w-4" />
-            <span className="text-sm font-medium">TurismoMX</span>
+            <span className="text-sm font-medium">Viator</span>
           </div>
           <p className="text-xs text-light-beige/40">
-            Versión 1.0.0 • © 2024 TurismoMX
+            Versión 1.0.0 • © 2026 Viator
           </p>
         </footer>
       </main>
@@ -109,3 +124,11 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+// Mantenemos esto fuera del componente si no cambia
+const settingsItems = [
+  { icon: User, label: "Mi perfil", description: "Edita tu información personal" },
+  { icon: Bell, label: "Notificaciones", description: "Configura tus alertas" },
+  { icon: Shield, label: "Privacidad", description: "Ajustes de privacidad y seguridad" },
+  { icon: HelpCircle, label: "Ayuda", description: "Centro de ayuda y soporte" },
+];

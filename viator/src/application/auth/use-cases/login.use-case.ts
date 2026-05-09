@@ -24,7 +24,7 @@ export class LoginUseCase {
     private readonly jwtService: JwtService,
     private readonly passwordService: PasswordService,
     private readonly tokenService: TokenService,
-  ) {}
+  ) { }
 
   async execute(dto: LoginUserDto): Promise<LoginResponse> {
     const user = await this.userRepository.findByEmail(dto.email);
@@ -51,7 +51,12 @@ export class LoginUseCase {
 
     return {
       access_token: accessToken,
-      user: UserMapper.toResponse(user),
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
     };
   }
 }

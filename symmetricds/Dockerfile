@@ -5,7 +5,7 @@ FROM jumpmind/symmetricds:3.15
 
 USER root
 
-# Instalar cliente MySQL
+# Instalar cliente MySQL y herramientas de red
 RUN apk add --no-cache mysql-client
 
 # Copiar configuración
@@ -17,9 +17,6 @@ COPY entrypoint.sh /opt/symmetric-ds/entrypoint.sh
 
 RUN sed -i 's/\r$//' /opt/symmetric-ds/entrypoint.sh && \
     chmod +x /opt/symmetric-ds/entrypoint.sh
-
-# Permisos
-RUN chmod +x /opt/symmetric-ds/entrypoint.sh
 
 EXPOSE 31415
 

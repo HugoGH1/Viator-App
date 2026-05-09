@@ -18,6 +18,8 @@ services:
     image: mysql:8.0
     container_name: viator_nestjs_db
     restart: unless-stopped
+    # SymmetricDS necesita crear funciones internas para los triggers
+    command: --log-bin-trust-function-creators=1
     environment:
       MYSQL_DATABASE: viator_db
       MYSQL_USER: viator_user
@@ -26,7 +28,6 @@ services:
     ports:
       - "3307:3306"
     volumes:
-      # Usamos el mismo directorio de tu proyecto para no perder datos
       - viator_mysql_data:/var/lib/mysql
       - ./mysql-init:/docker-entrypoint-initdb.d
     networks:
@@ -36,7 +37,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 30s
 
   # ---------------------------------------------------------------------------
   # PostgreSQL - Réplica de solo lectura (CQRS Read Side)
@@ -80,15 +81,8 @@ services:
         condition: service_healthy
       viator-postgres-read:
         condition: service_healthy
-      viator-symmetricds:
-        condition: service_healthy
     networks:
       - viator-network
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:31415"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
 
   # ---------------------------------------------------------------------------
   # Base de datos para el proyecto .NET (viatorAPI)
@@ -146,6 +140,43 @@ services:
         condition: service_healthy
       viator-postgres-read:
         condition: service_healthy
+      viator-symmetricds:
+        condition: service_started
+    networks:
+      - viator-network
+
+  # ---------------------------------------------------------------------------
+  # Cron Worker NestJS (viator-cron)
+  # Background jobs, no expone puertos
+  # ---------------------------------------------------------------------------
+  viator-cron:
+    build:
+      context: .
+      dockerfile: viator-cron/Dockerfile
+    container_name: viator_nestjs_cron
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "mysql://viator_user:viator_password@viator-mysql:3306/viator_db"
+      DB_HOST: viator-mysql
+      DB_PORT: "3306"
+      DB_USER: viator_user
+      DB_PASSWORD: viator_password
+      DB_NAME: viator_db
+      # PostgreSQL Read Replica
+      READ_DATABASE_URL: "postgresql://viator_read_user:viator_read_password@viator-postgres-read:5432/viator_read_db"
+      READ_DB_HOST: viator-postgres-read
+      READ_DB_PORT: "5432"
+      READ_DB_USER: viator_read_user
+      READ_DB_PASSWORD: viator_read_password
+      READ_DB_NAME: viator_read_db
+      NODE_ENV: ${NODE_ENV:-development}
+    depends_on:
+      viator-mysql:
+        condition: service_healthy
+      viator-postgres-read:
+        condition: service_healthy
+      viator-symmetricds:
+        condition: service_started
     networks:
       - viator-network
 

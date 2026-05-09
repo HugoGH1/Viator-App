@@ -30,18 +30,20 @@ VALUES
 INSERT IGNORE INTO sym_trigger
   (trigger_id, source_table_name, channel_id,
    sync_on_insert, sync_on_update, sync_on_delete,
+   sync_on_incoming_batch, use_stream_lobs,
    last_update_time, create_time)
 VALUES
   ('trigger_user', 'User', 'viator_channel',
-   1, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+   1, 1, 1, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT IGNORE INTO sym_trigger
   (trigger_id, source_table_name, channel_id,
    sync_on_insert, sync_on_update, sync_on_delete,
+   sync_on_incoming_batch, use_stream_lobs,
    last_update_time, create_time)
 VALUES
   ('trigger_session', 'Session', 'viator_channel',
-   1, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+   1, 1, 1, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- 5. Router: envía TODOS los datos del master al replica (tipo default)
 INSERT IGNORE INTO sym_router
@@ -53,15 +55,15 @@ VALUES
 
 -- 6. Enlazar cada trigger con el router
 INSERT IGNORE INTO sym_trigger_router
-  (trigger_id, router_id,
+  (trigger_id, router_id, initial_load_order, initial_load_select,
    last_update_time, create_time)
 VALUES
-  ('trigger_user', 'master_to_replica',
+  ('trigger_user', 'master_to_replica', 1, NULL,
    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT IGNORE INTO sym_trigger_router
-  (trigger_id, router_id,
+  (trigger_id, router_id, initial_load_order, initial_load_select,
    last_update_time, create_time)
 VALUES
-  ('trigger_session', 'master_to_replica',
+  ('trigger_session', 'master_to_replica', 2, NULL,
    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

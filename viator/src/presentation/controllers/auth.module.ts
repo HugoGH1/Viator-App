@@ -23,6 +23,7 @@ import { TokenService } from 'src/application/auth/helpers/token.service';
 import { CqrsModule } from '@nestjs/cqrs';
 import { RegisterUserCommandHandler } from 'src/application/auth/commands/register-user/register-user.handler';
 import { FindAllUsersQueryHandler } from 'src/application/auth/queries/find-all-users/find-all-users.handler';
+import { RefreshSessionActivityUseCase } from 'src/application/auth/use-cases/refreshSessionAct.use-case';
 
 export const CommandHandlers = [
   RegisterUserCommandHandler,
@@ -57,6 +58,7 @@ export const QueryHandlers = [
     LogoutUseCase,
     ValidateSessionUseCase,
     RegisterAdminUseCase,
+    RefreshSessionActivityUseCase,
     PasswordService,
     TokenService,
     JwtStrategy,

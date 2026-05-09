@@ -36,7 +36,7 @@ export interface Evento {
     lugar: string,
     fechaEvento: string,
     precio: number,
-    capacidadMax: number,
+    capacidadMaxima: number,
     idEmpresa: string,
 
     empresa?: Empresa;
@@ -51,6 +51,18 @@ export async function getEmpresas(): Promise<Empresa[]> {
 export async function getEmpresaById(id: string): Promise<Empresa> {
     const res = await fetch(`${API_URL}/api/Empresa/${id}`);
     if (!res.ok) throw new ApiResponseError(`Empresa no encontrada: ${res.statusText}`, res.status);
+    return await res.json();
+}
+
+export async function getCategorias(): Promise<Categoria[]> {
+    const res = await fetch(`${API_URL}/api/Categoria/Categorias`);
+    if (!res.ok) throw new ApiResponseError(`No se pudieron obtener las categorias: ${res.statusText}`, res.status);
+    return await res.json();
+}
+
+export async function getEventos(): Promise<Evento[]> {
+    const res = await fetch(`${API_URL}/api/Evento/GetAll`);
+    if (!res.ok) throw new ApiResponseError(`No se pudieron obtener los eventos: ${res.statusText}`, res.status);
     return await res.json();
 }
 

@@ -52,7 +52,7 @@ export function DesktopSidebar() {
 
       <div className="px-4 py-6 border-t border-medium-blue-accent">
         <p className="text-xs text-muted-foreground text-center">
-          © 2024 TurismoMX
+          © 2026 Viator
         </p>
       </div>
     </aside>
