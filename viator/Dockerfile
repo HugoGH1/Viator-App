@@ -1,28 +1,56 @@
 # =============================================================================
-# Dockerfile para desarrollo local / ambiente de pruebas
-# Usa start:dev (hot reload con --watch)
-#
-# Para producción, considerar multi-stage con start:prod
+# Dockerfile - NestJS API (Development / Testing)
+# Configura automáticamente:
+# - Prisma MySQL (primary)
+# - Prisma PostgreSQL replica schema
+# - Generación de clientes Prisma
+# - Migraciones
 # =============================================================================
+
 FROM node:22-alpine
 
 WORKDIR /usr/src/app
 
-# Copia manifiestos de dependencias primero (aprovecha la caché de Docker)
+# -------------------------------------------------------------------
+# Copiar archivos de dependencias primero (cache layer)
+# -------------------------------------------------------------------
 COPY package*.json ./
-COPY prisma ./prisma/
 
-# Instala TODAS las dependencias (incluidas devDependencies para compilar en --watch)
+COPY prisma ./prisma/
+COPY prisma.config.ts ./
+COPY prisma-read.config.ts ./
+
+# -------------------------------------------------------------------
+# Instalar dependencias
+# -------------------------------------------------------------------
 RUN npm ci
 
-# Genera el cliente de Prisma
-RUN npx prisma generate
-
-# Copia el resto del código fuente
+# -------------------------------------------------------------------
+# Copiar código fuente
+# -------------------------------------------------------------------
 COPY . .
 
-# Expone el puerto de la aplicación
+# -------------------------------------------------------------------
+# Generar cliente Prisma principal (MySQL)
+# -------------------------------------------------------------------
+RUN npx prisma generate
+
+# -------------------------------------------------------------------
+# Generar cliente Prisma read replica (PostgreSQL)
+# -------------------------------------------------------------------
+RUN npx prisma generate --config=./prisma-read.config.ts
+
+# -------------------------------------------------------------------
+# Puerto API
+# -------------------------------------------------------------------
 EXPOSE 3000
 
-# Aplica migraciones pendientes y luego levanta la app en modo desarrollo (hot reload)
+# -------------------------------------------------------------------
+# Startup automático
+#
+# 1. Esperar infraestructura
+# 2. Crear schema PostgreSQL replica
+# 3. Ejecutar migraciones MySQL
+# 4. Iniciar NestJS
+# -------------------------------------------------------------------
 CMD ["sh", "-c", "npx prisma migrate deploy && npm run start:dev"]

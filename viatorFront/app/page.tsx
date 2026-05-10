@@ -1,21 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useEmpresas } from "@/hooks/use-Empresas"
+import { useCategorias } from "@/hooks/use-Categorias";
 import { MapPin } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { CategoryPills } from "@/components/category-pills";
 import { BusinessCard } from "@/components/business-card";
-import { categories, getBusinessesByCategory } from "@/lib/data";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/auth-provider";
 
 export default function HomePage() {
-  const { empresas, isLoading, error, refetch } = useEmpresas();
-  const [activeCategory, setActiveCategory] = useState("all");
-  const businesses = getBusinessesByCategory(activeCategory);
+  const { user, isLoading: authLoading } = useAuth();
+  const router = useRouter();
 
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}<button onClick={refetch}>Reintentar</button></div>;
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
+
+  const { empresas, isLoading: empresasLoading, error, refetch } = useEmpresas();
+  const { categorias, isLoading: categoriasLoading } = useCategorias();
+  const [activeCategory, setActiveCategory] = useState("all");
+
+  const filteredEmpresas = useMemo(() => {
+    if (activeCategory === "all") return empresas;
+    return empresas.filter((e) => {
+      if (e.idCategoria === activeCategory) return true;
+      return false;
+    });
+  }, [empresas, activeCategory]);
+
+  if (authLoading || (!user && !authLoading)) return <div className="min-h-screen bg-dark-blue flex items-center justify-center text-light-beige">Cargando sesión...</div>;
+  if (empresasLoading || categoriasLoading) return <div className="min-h-screen bg-dark-blue flex items-center justify-center text-light-beige">Cargando lugares...</div>;
+  if (error) return <div className="min-h-screen bg-dark-blue flex items-center justify-center text-light-beige">Error: {error}<button onClick={refetch} className="ml-4 underline">Reintentar</button></div>;
 
   return (
     <div className="min-h-screen bg-dark-blue">
@@ -41,25 +61,24 @@ export default function HomePage() {
           </h2>
 
           <CategoryPills
-            categories={categories}
+            categories={categorias}
             activeCategory={activeCategory}
             onCategoryChange={setActiveCategory}
           />
         </header>
 
-        {/* Recommendations Section */}
         <section className="px-5 md:px-8">
           <h3 className="text-lg font-semibold text-very-light-beige mb-4">
             Nuestra recomendación
           </h3>
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {empresas.map((empresa) => (
+            {filteredEmpresas.map((empresa) => (
               <BusinessCard key={empresa.id} business={empresa} />
             ))}
           </div>
 
-          {businesses.length === 0 && (
+          {filteredEmpresas.length === 0 && (
             <div className="text-center py-12">
               <p className="text-light-beige">
                 No hay resultados para esta categoría.

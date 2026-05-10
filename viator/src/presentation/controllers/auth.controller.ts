@@ -5,6 +5,7 @@ import {
   Get,
   UseGuards,
   Request,
+  Req,
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { RegisterUserDto } from '../../application/auth/dtos/registerUser.dto';
@@ -22,6 +23,7 @@ import { LogoutUseCase } from 'src/application/auth/use-cases/logout.use-case';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { FindAllUsersQuery } from 'src/application/auth/queries/find-all-users/find-all-users.query';
 import { RegisterUserCommand } from 'src/application/auth/commands/register-user/register-user.command';
+import { RefreshSessionActivityUseCase } from 'src/application/auth/use-cases/refreshSessionAct.use-case';
 
 @Controller('auth')
 export class AuthController {
@@ -31,6 +33,7 @@ export class AuthController {
     private readonly loginUseCase: LoginUseCase,
     private readonly registerAdminCase: RegisterAdminUseCase,
     private readonly logoutUseCase: LogoutUseCase,
+    private readonly refreshSessionActivityUseCase: RefreshSessionActivityUseCase,
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
   ) { }
@@ -69,6 +72,14 @@ export class AuthController {
   async login(@Body() dto: LoginUserDto) {
     return await this.loginUseCase.execute(dto);
   }
+
+  @Post('heartbeat')
+  @UseGuards(JwtAuthGuard)
+  async heartbeat(@Req() req) {
+    const sessionId = req.user.sessionId;
+    return await this.refreshSessionActivityUseCase.refreshSessionActivity(sessionId);
+  }
+
 
   @UseGuards(JwtAuthGuard)
   @Post('logout')

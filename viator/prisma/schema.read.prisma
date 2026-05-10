@@ -1,0 +1,48 @@
+// =============================================================================
+// Prisma Schema - Read Replica (PostgreSQL)
+//
+// Este schema genera un cliente Prisma separado para consultas de solo lectura
+// contra la réplica PostgreSQL. Los modelos son un espejo exacto del schema
+// principal (MySQL) pero con provider PostgreSQL.
+//
+// Generar con: npx prisma generate --schema=./prisma/schema.read.prisma
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma/read-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Modelos espejo (solo lectura — las escrituras van a MySQL)
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  role         Role      @default(USER)
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  tokenHash String   @unique
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}

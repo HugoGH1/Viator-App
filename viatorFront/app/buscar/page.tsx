@@ -1,26 +1,41 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Search } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { BusinessCard } from "@/components/business-card";
-import { businesses } from "@/lib/data";
+import { useEmpresas } from "@/hooks/use-Empresas";
+import { useAuth } from "@/components/auth-provider";
+import { useRouter } from "next/navigation";
 
 export default function SearchPage() {
   const [query, setQuery] = useState("");
+  const { user, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
+
+  const { empresas, isLoading: empresasLoading } = useEmpresas();
 
   const filteredBusinesses = useMemo(() => {
-    if (!query.trim()) return businesses;
+    if (!query.trim()) return empresas;
 
     const lowerQuery = query.toLowerCase();
-    return businesses.filter(
+    return empresas.filter(
       (business) =>
-        business.name.toLowerCase().includes(lowerQuery) ||
-        business.description.toLowerCase().includes(lowerQuery) ||
-        business.neighborhood.toLowerCase().includes(lowerQuery)
+        (business.nombre && business.nombre.toLowerCase().includes(lowerQuery)) ||
+        (business.colonia && business.colonia.toLowerCase().includes(lowerQuery)) ||
+        (business.ciudad && business.ciudad.toLowerCase().includes(lowerQuery))
     );
-  }, [query]);
+  }, [query, empresas]);
+
+  if (authLoading || (!user && !authLoading)) return <div className="min-h-screen bg-dark-blue flex items-center justify-center text-light-beige">Cargando sesión...</div>;
+  if (empresasLoading) return <div className="min-h-screen bg-dark-blue flex items-center justify-center text-light-beige">Cargando lugares...</div>;
 
   return (
     <div className="min-h-screen bg-dark-blue">

@@ -1,23 +1,46 @@
+"use client";
+
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
 import { ArrowLeft, MapPin, Phone } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { StarRating } from "@/components/star-rating";
 import { ImageGallery } from "@/components/image-gallery";
-import { getEmpresaById } from "@/lib/api";
+import { getEmpresaById, type Empresa } from "@/lib/api";
+import { useAuth } from "@/components/auth-provider";
+import { use, useEffect, useState } from "react";
+import { Map, MapControls, MapMarker, MarkerContent, MarkerTooltip, MarkerPopup } from "@/components/ui/map";
 
 interface BusinessDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function BusinessDetailPage({ params }: BusinessDetailPageProps) {
-  const { id } = await params;
+export default function BusinessDetailPage({ params }: BusinessDetailPageProps) {
+  const { id } = use(params);
+  const { user, isLoading: authLoading } = useAuth();
+  const router = useRouter();
 
-  let business;
-  try {
-    business = await getEmpresaById(id);
-  } catch (error) {
+  const [business, setBusiness] = useState<Empresa | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
+
+  useEffect(() => {
+    getEmpresaById(id)
+      .then((data) => setBusiness(data))
+      .catch(() => setBusiness(null))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (authLoading || (!user && !authLoading)) return <div className="min-h-screen bg-dark-blue flex items-center justify-center text-light-beige">Cargando sesión...</div>;
+  if (loading) return <div className="min-h-screen bg-dark-blue flex items-center justify-center text-light-beige">Cargando información...</div>;
+
+  if (!business) {
     notFound();
   }
 
@@ -99,26 +122,76 @@ export default async function BusinessDetailPage({ params }: BusinessDetailPageP
 
             {/* Map Preview Placeholder */}
             <div className="block relative aspect-video rounded-2xl overflow-hidden hover:ring-2 hover:ring-action-green transition-all group bg-medium-blue flex items-center justify-center">
-              <div className="text-very-light-beige/50 font-medium">
-                <span>Mapa no disponible por ahora</span>
-              </div>
+              <Map center={[-104.6698, 24.0253]} zoom={17}>
+                <MapMarker
+                  key={business.id}
+                  longitude={-104.6698}
+                  latitude={24.0253}
+                >
+                  <MarkerContent>
+                    <div className="bg-action-green size-6 rounded-full border-2 border-white shadow-lg" />
+                  </MarkerContent>
+
+                  <MarkerTooltip>{business.nombre}</MarkerTooltip>
+
+                  <MarkerPopup>
+                    <div className="space-y-1 p-1">
+                      <p className="text-dark-blue font-bold text-sm">{business.nombre}</p>
+                      <p className="text-slate-500 text-[10px]">
+                        {-104.6698}, {24.0253}
+                      </p>
+                    </div>
+                  </MarkerPopup>
+                </MapMarker>
+                <MapControls />
+              </Map>
             </div>
           </section>
         </div>
 
-        {/* Floating Reserve Button - Mobile */}
-        <div className="fixed bottom-20 left-0 right-0 px-5 md:hidden z-30">
-          <button className="w-full py-4 bg-action-green text-dark-blue font-bold text-lg rounded-2xl shadow-lg hover:bg-action-green/90 active:scale-[0.98] transition-all">
-            Contactar
-          </button>
-        </div>
+        {/* Action Buttons */}
+        {(() => {
+          // Lógica para determinar si esta empresa ofrece eventos
+          // Se verifica si el ID de la categoría corresponde exactamente a la de Eventos
+          const isEventosProvider = business.idCategoria === 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
 
-        {/* Reserve Button - Desktop */}
-        <div className="hidden md:block px-8 pt-6">
-          <button className="w-full max-w-md mx-auto block py-4 bg-action-green text-dark-blue font-bold text-lg rounded-2xl shadow-lg hover:bg-action-green/90 active:scale-[0.98] transition-all">
-            Contactar ahora
-          </button>
-        </div>
+          if (isEventosProvider) {
+            return (
+              <>
+                <div className="fixed bottom-20 left-0 right-0 px-5 md:hidden z-30">
+                  <button 
+                    onClick={() => router.push(`/empresa/${business.id}/eventos`)}
+                    className="w-full py-4 bg-[#F2C94C] text-dark-blue font-bold text-lg rounded-2xl shadow-lg hover:bg-[#F2C94C]/90 active:scale-[0.98] transition-all">
+                    Ver Eventos
+                  </button>
+                </div>
+                <div className="hidden md:block px-8 pt-6">
+                  <button 
+                    onClick={() => router.push(`/empresa/${business.id}/eventos`)}
+                    className="w-full max-w-md mx-auto block py-4 bg-[#F2C94C] text-dark-blue font-bold text-lg rounded-2xl shadow-lg hover:bg-[#F2C94C]/90 active:scale-[0.98] transition-all">
+                    Ver Eventos Disponibles
+                  </button>
+                </div>
+              </>
+            );
+          }
+
+          return (
+            <>
+              <div className="fixed bottom-20 left-0 right-0 px-5 md:hidden z-30">
+                <button className="w-full py-4 bg-action-green text-dark-blue font-bold text-lg rounded-2xl shadow-lg hover:bg-action-green/90 active:scale-[0.98] transition-all">
+                  Contactar
+                </button>
+              </div>
+              <div className="hidden md:block px-8 pt-6">
+                <button className="w-full max-w-md mx-auto block py-4 bg-action-green text-dark-blue font-bold text-lg rounded-2xl shadow-lg hover:bg-action-green/90 active:scale-[0.98] transition-all">
+                  Contactar ahora
+                </button>
+              </div>
+            </>
+          );
+        })()}
+
       </main>
 
       <BottomNav />

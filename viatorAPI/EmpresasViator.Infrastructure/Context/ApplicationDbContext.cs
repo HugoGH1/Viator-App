@@ -24,6 +24,10 @@ public class ApplicationDbContext : DbContext
             .HasIndex(e => new { e.Lugar, e.FechaEvento })
             .IsUnique();
 
+        modelBuilder.Entity<Evento>()
+            .Property(e => e.Precio)
+            .HasPrecision(18, 2);
+
         modelBuilder.Entity<Categoria>().HasData(
             new Categoria
             {
