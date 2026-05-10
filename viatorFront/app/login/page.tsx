@@ -22,10 +22,14 @@ export default function LoginPage() {
         e.preventDefault()
         setErrorMsg("")
         setIsLoading(true)
-        
+
         try {
             const response = await authAPI.login(email, password)
-            setSession(response)
+            if ("message" in response) {
+                setErrorMsg(response.message)
+                return
+            }
+            setSession(response);
             router.push("/")
         } catch (error: any) {
             console.error("Login error:", error)
@@ -44,10 +48,8 @@ export default function LoginPage() {
                 </Link>
             </header>
 
-            {/* Main Content */}
             <main className="flex-1 flex items-center justify-center px-6 pb-12">
                 <div className="w-full max-w-md">
-                    {/* Welcome Text */}
                     <div className="text-center mb-8">
                         <h1 className="text-3xl font-bold text-very-light-beige mb-2">
                             Bienvenido de nuevo
@@ -63,9 +65,7 @@ export default function LoginPage() {
                         </div>
                     )}
 
-                    {/* Inicio de Sesión */}
                     <form onSubmit={handleSubmit} className="space-y-5">
-                        {/* Email */}
                         <div className="space-y-2">
                             <label htmlFor="email" className="text-sm font-medium text-light-beige">
                                 Correo electronico
@@ -84,7 +84,6 @@ export default function LoginPage() {
                             </div>
                         </div>
 
-                        {/* Password */}
                         <div className="space-y-2">
                             <label htmlFor="password" className="text-sm font-medium text-light-beige">
                                 Password
@@ -110,8 +109,6 @@ export default function LoginPage() {
                                 </button>
                             </div>
                         </div>
-
-                        {/* Ingresar */}
                         <Button
                             type="submit"
                             disabled={isLoading}
@@ -121,7 +118,6 @@ export default function LoginPage() {
                         </Button>
                     </form>
 
-                    {/* Crear cuenta */}
                     <p className="text-center mt-8 text-light-beige">
                         No tienes una cuenta?{" "}
                         <Link

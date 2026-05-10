@@ -14,8 +14,14 @@ export interface LoginResponse {
     user: User;
 }
 
+export interface LoginError {
+    message: string;
+}
+
+type LoginResult = LoginResponse | LoginError;
+
 export const authAPI = {
-    login: async (email: string, password: string): Promise<LoginResponse> => {
+    login: async (email: string, password: string): Promise<LoginResult> => {
         const res = await fetch(`${NEXT_PUBLIC_AUTH_API_URL}/auth/login`, {
             method: 'POST',
             headers: {
@@ -26,8 +32,9 @@ export const authAPI = {
 
         if (!res.ok) {
             const errorData = await res.json().catch(() => null);
-            const errorMessage = errorData?.message || res.statusText;
-            throw new ApiResponseError(`Error de inicio de sesión: ${errorMessage}`, res.status);
+            return {
+                message: errorData?.message || "Credenciales inválidas"
+            }
         }
 
         return await res.json();

@@ -8,9 +8,12 @@ export class LogoutUseCase {
   constructor(
     @Inject(ISESSION_REPOSITORY)
     private readonly sessionRepository: ISessionRepository,
-  ) {}
+  ) { }
 
   async execute(id: string): Promise<void> {
+    const session = await this.sessionRepository.findUnique(id);
+    if (!session) return;
+
     await this.sessionRepository.delete(id);
   }
 }
