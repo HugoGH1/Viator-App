@@ -88,7 +88,7 @@ services:
       interval: 15s
       timeout: 10s
       retries: 20
-      start_period: 120s
+      start_period: 60s
 
   # ---------------------------------------------------------------------------
   # Base de datos para el proyecto .NET (viatorAPI)
@@ -182,7 +182,7 @@ services:
       viator-postgres-read:
         condition: service_healthy
       viator-symmetricds:
-        condition: service_started
+        condition: service_healthy
     networks:
       - viator-network
 
