@@ -147,7 +147,7 @@ services:
       viator-postgres-read:
         condition: service_healthy
       viator-symmetricds:
-        condition: service_healthy
+        condition: service_started
     networks:
       - viator-network
 
@@ -182,7 +182,7 @@ services:
       viator-postgres-read:
         condition: service_healthy
       viator-symmetricds:
-        condition: service_healthy
+        condition: service_started
     networks:
       - viator-network
 
