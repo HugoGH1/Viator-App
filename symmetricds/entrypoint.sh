@@ -22,7 +22,7 @@ REPLICA_STAGED="$SYM_HOME/postgres-replica.properties.staged"
 # 1. Esperar MySQL
 # -------------------------------------------------------------------
 wait_for_mysql() {
-  echo "[1/7] Esperando MySQL..."
+  echo "[1/5] Esperando MySQL..."
   local retries=60
   while [ $retries -gt 0 ]; do
     if $MYSQL_CMD -D "$MYSQL_DB" -e "SELECT 1" > /dev/null 2>&1; then
@@ -41,7 +41,7 @@ wait_for_mysql() {
 # 2. Esperar PostgreSQL replica
 # -------------------------------------------------------------------
 wait_for_postgres() {
-  echo "[2/7] Esperando PostgreSQL replica..."
+  echo "[2/5] Esperando PostgreSQL replica..."
   local retries=60
   while [ $retries -gt 0 ]; do
     if nc -z viator-postgres-read 5432 > /dev/null 2>&1; then
@@ -63,29 +63,77 @@ wait_for_mysql
 wait_for_postgres
 
 # -------------------------------------------------------------------
-# FASE 1: Iniciar SymmetricDS SOLO con el motor mysql-master
-# Movemos postgres-replica.properties fuera de engines/ para que
-# SymmetricDS NO intente arrancarlo prematuramente.
+# 4. Detectar si es primera ejecucion o ejecucion subsecuente
+#    Miramos si ya existe la tabla sym_trigger en MySQL (la crea
+#    SymmetricDS en su bootstrap, existe incluso antes de configurar).
 # -------------------------------------------------------------------
-echo "[3/7] Preparando arranque Fase 1 (solo mysql-master)..."
+SYM_TABLES_EXIST=$(
+  $MYSQL_CMD "$MYSQL_DB" -N -e "
+    SELECT COUNT(*)
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA='$MYSQL_DB'
+      AND TABLE_NAME = 'sym_trigger';
+  " 2>/dev/null || echo "0"
+)
 
+IS_CONFIGURED=$(
+  if [ "$SYM_TABLES_EXIST" = "1" ] 2>/dev/null; then
+    $MYSQL_CMD "$MYSQL_DB" -N -e "
+      SELECT COUNT(*)
+      FROM sym_trigger
+      WHERE trigger_id='trigger_user';
+    " 2>/dev/null || echo "0"
+  else
+    echo "0"
+  fi
+)
+
+# ===================================================================
+# RUTA A: Ya configurado previamente → Arrancar con AMBOS motores
+# ===================================================================
+if [ "$IS_CONFIGURED" != "0" ] 2>/dev/null; then
+  echo "[3/5] Configuracion existente detectada."
+  echo "[4/5] Nada que configurar."
+
+  # Asegurar que postgres-replica.properties esta en engines/
+  if [ -f "$REPLICA_STAGED" ]; then
+    mv "$REPLICA_STAGED" "$REPLICA_PROPS"
+  fi
+
+  echo "[5/5] Iniciando SymmetricDS con ambos motores..."
+  echo "==========================================="
+  echo "  Replicacion MySQL -> PostgreSQL activa"
+  echo "==========================================="
+
+  # exec reemplaza este proceso → Docker recibe senales correctamente
+  exec $SYM_HOME/bin/sym --port 31415
+fi
+
+# ===================================================================
+# RUTA B: Primera ejecucion → Setup completo
+# ===================================================================
+echo "[3/5] Primera ejecucion detectada. Configurando..."
+
+# -------------------------------------------------------------------
+# 3a. Mover replica fuera para que solo arranque mysql-master
+# -------------------------------------------------------------------
 if [ -f "$REPLICA_PROPS" ]; then
   mv "$REPLICA_PROPS" "$REPLICA_STAGED"
   echo "  postgres-replica.properties movido a staging."
 fi
 
-echo "[4/7] Iniciando SymmetricDS (solo motor mysql-master)..."
+# -------------------------------------------------------------------
+# 3b. Arrancar SymmetricDS TEMPORALMENTE solo con mysql-master
+# -------------------------------------------------------------------
+echo "  Iniciando SymmetricDS temporal (solo mysql-master)..."
 
-$SYM_HOME/bin/sym \
-  --port 31415 &
-
+$SYM_HOME/bin/sym --port 31415 &
 SYM_PID=$!
 
 # -------------------------------------------------------------------
-# 4. Esperar bootstrap completo de SymmetricDS
-#    Verificamos que las tablas sym_* criticas existan en MySQL
+# 3c. Esperar bootstrap completo (tablas sym_* en MySQL)
 # -------------------------------------------------------------------
-echo "[5/7] Esperando bootstrap de SymmetricDS en MySQL..."
+echo "[4/5] Esperando bootstrap de SymmetricDS..."
 
 retries=120
 while [ $retries -gt 0 ]; do
@@ -104,7 +152,9 @@ while [ $retries -gt 0 ]; do
   fi
 
   retries=$((retries - 1))
-  echo "  Esperando tablas sym_* ($TABLE_COUNT/4 encontradas, $retries restantes)"
+  if [ $((retries % 10)) -eq 0 ]; then
+    echo "  Esperando tablas sym_* ($TABLE_COUNT/4, $retries restantes)"
+  fi
   sleep 5
 done
 
@@ -113,159 +163,88 @@ if [ "$TABLE_COUNT" != "4" ] 2>/dev/null; then
   exit 1
 fi
 
-# -------------------------------------------------------------------
-# 5. Esperar a que SymmetricDS HTTP este escuchando
-#    Esto es CRITICO: el nodo replica necesita conectarse via HTTP
-# -------------------------------------------------------------------
-echo "  Esperando que el servidor HTTP de SymmetricDS responda..."
-retries=60
-while [ $retries -gt 0 ]; do
-  if wget -q -O /dev/null http://localhost:31415/sync/mysql-master 2>/dev/null || \
-     curl -sf http://localhost:31415/sync/mysql-master > /dev/null 2>&1; then
-    echo "  Servidor HTTP de SymmetricDS activo en puerto 31415."
-    break
-  fi
-  retries=$((retries - 1))
-  sleep 3
-done
-
-if [ $retries -eq 0 ]; then
-  echo "[warning] No se pudo verificar HTTP, continuando de todas formas..."
-fi
-
-# Dar tiempo extra para estabilizacion del motor master
-echo "  Estabilizando motor master (15s)..."
+# Esperar a que el motor se estabilice
 sleep 15
 
 # -------------------------------------------------------------------
-# 6. Aplicar configuracion y preparar replica
+# 3d. Aplicar configuracion SQL
 # -------------------------------------------------------------------
-CONFIGURED=$(
-  $MYSQL_CMD "$MYSQL_DB" -N -e "
-    SELECT COUNT(*)
-    FROM sym_trigger
-    WHERE trigger_id='trigger_user';
-  " 2>/dev/null || echo "0"
-)
+echo "  Aplicando configuracion de replicacion..."
+$MYSQL_CMD "$MYSQL_DB" < $CONFIG_SQL
+echo "  Configuracion SQL aplicada."
 
-if [ "$CONFIGURED" = "0" ]; then
-  echo "[6/7] Primera ejecucion - aplicando configuracion inicial..."
+# Esperar procesamiento
+sleep 10
 
-  # 6a. Insertar configuracion en tablas sym_*
-  $MYSQL_CMD "$MYSQL_DB" < $CONFIG_SQL
+# -------------------------------------------------------------------
+# 3e. Sincronizar triggers
+# -------------------------------------------------------------------
+echo "  Sincronizando triggers..."
+$SYM_HOME/bin/symadmin --engine mysql-master sync-triggers
 
-  if [ $? -ne 0 ]; then
-    echo "[error] Fallo al aplicar configuracion."
-    exit 1
+# -------------------------------------------------------------------
+# 3f. Abrir registro para el nodo replica
+# -------------------------------------------------------------------
+echo "  Abriendo registro para nodo replica-001..."
+$SYM_HOME/bin/symadmin --engine mysql-master open-registration replica replica-001
+
+# Verificar que el registro se abrio
+retries=15
+REG_READY="0"
+while [ $retries -gt 0 ]; do
+  REG_READY=$(
+    $MYSQL_CMD "$MYSQL_DB" -N -e "
+      SELECT COUNT(*)
+      FROM sym_node_security
+      WHERE node_id='replica-001'
+        AND registration_enabled=1;
+    " 2>/dev/null || echo "0"
+  )
+  if [ "$REG_READY" = "1" ] 2>/dev/null; then
+    echo "  Registro abierto para replica-001 confirmado."
+    break
   fi
-  echo "  Configuracion SQL aplicada."
+  retries=$((retries - 1))
+  sleep 2
+done
 
-  # 6b. Esperar procesamiento
-  echo "  Esperando procesamiento de configuracion (15s)..."
-  sleep 15
-
-  # 6c. Sincronizar triggers en MySQL
-  echo "  Sincronizando triggers..."
-  $SYM_HOME/bin/symadmin \
-    --engine mysql-master \
-    sync-triggers
-
-  # 6d. Abrir registro para el nodo replica (fallback si auto.registration falla)
-  echo "  Abriendo registro para nodo replica-001..."
-  $SYM_HOME/bin/symadmin \
-    --engine mysql-master \
-    open-registration replica replica-001
-
-  # 6e. Verificar que el registro esta abierto antes de arrancar el replica
-  echo "  Verificando registro abierto en sym_node_security..."
-  retries=20
-  REG_READY="0"
-  while [ $retries -gt 0 ]; do
-    REG_READY=$(
-      $MYSQL_CMD "$MYSQL_DB" -N -e "
-        SELECT COUNT(*)
-        FROM sym_node_security
-        WHERE node_id='replica-001'
-          AND registration_enabled=1;
-      " 2>/dev/null || echo "0"
-    )
-    if [ "$REG_READY" = "1" ] 2>/dev/null; then
-      echo "  CONFIRMADO: Registro abierto para replica-001."
-      break
-    fi
-    retries=$((retries - 1))
-    echo "  Esperando confirmacion de registro... ($retries restantes)"
-    sleep 3
-  done
-
-  if [ "$REG_READY" != "1" ] 2>/dev/null; then
-    echo "[warning] No se confirmo registro, reintentando open-registration..."
-    $SYM_HOME/bin/symadmin \
-      --engine mysql-master \
-      open-registration replica replica-001
-    sleep 10
-  fi
-
-  # -------------------------------------------------------------------
-  # FASE 2: Restaurar postgres-replica.properties
-  # El master esta configurado, los triggers estan listos, y el
-  # registro esta abierto. Ahora es seguro arrancar el replica.
-  # -------------------------------------------------------------------
-  echo "  FASE 2: Iniciando motor postgres-replica..."
-  if [ -f "$REPLICA_STAGED" ]; then
-    mv "$REPLICA_STAGED" "$REPLICA_PROPS"
-    echo "  postgres-replica.properties restaurado en engines/."
-  fi
-
-  # 6f. Esperar registro exitoso del replica (polling activo)
-  echo "  Esperando que replica-001 complete su registro..."
-  retries=90
-  while [ $retries -gt 0 ]; do
-    NODE_REGISTERED=$(
-      $MYSQL_CMD "$MYSQL_DB" -N -e "
-        SELECT COUNT(*)
-        FROM sym_node
-        WHERE node_id='replica-001';
-      " 2>/dev/null || echo "0"
-    )
-    if [ "$NODE_REGISTERED" = "1" ] 2>/dev/null; then
-      echo "  Nodo replica-001 registrado exitosamente!"
-      break
-    fi
-    retries=$((retries - 1))
-    if [ $((retries % 10)) -eq 0 ]; then
-      echo "  Esperando registro de replica... ($retries restantes)"
-    fi
-    sleep 5
-  done
-
-  if [ "$NODE_REGISTERED" != "1" ] 2>/dev/null; then
-    echo "[warning] El nodo replica no se registro en el tiempo esperado."
-    echo "  auto.registration=true reintentara automaticamente."
-    echo "  Si persiste: docker compose restart viator-symmetricds"
-  else
-    # 6g. Enviar carga inicial (auto.reload=true deberia hacerlo, esto es fallback)
-    echo "  Enviando carga inicial (fallback)..."
-    sleep 5
-    $SYM_HOME/bin/symadmin \
-      --engine mysql-master \
-      reload-node replica-001 2>/dev/null || echo "  auto.reload ya envio la carga inicial."
-  fi
-
-else
-  echo "[6/7] Configuracion ya existente, restaurando replica..."
-  if [ -f "$REPLICA_STAGED" ]; then
-    mv "$REPLICA_STAGED" "$REPLICA_PROPS"
-    echo "  postgres-replica.properties restaurado."
-  fi
+if [ "$REG_READY" != "1" ] 2>/dev/null; then
+  echo "  Reintentando open-registration..."
+  $SYM_HOME/bin/symadmin --engine mysql-master open-registration replica replica-001
+  sleep 5
 fi
 
-echo "[7/7] SymmetricDS listo y replicando."
+# -------------------------------------------------------------------
+# 3g. DETENER SymmetricDS temporal
+#     El hot-deploy de engines no es confiable, asi que matamos
+#     el proceso y reiniciamos con AMBOS motores.
+# -------------------------------------------------------------------
+echo "  Deteniendo SymmetricDS temporal..."
+kill $SYM_PID 2>/dev/null || true
+wait $SYM_PID 2>/dev/null || true
+echo "  SymmetricDS detenido."
+
+# Dar tiempo para liberar puertos
+sleep 5
+
+# -------------------------------------------------------------------
+# 3h. Restaurar postgres-replica.properties
+# -------------------------------------------------------------------
+if [ -f "$REPLICA_STAGED" ]; then
+  mv "$REPLICA_STAGED" "$REPLICA_PROPS"
+  echo "  postgres-replica.properties restaurado en engines/."
+fi
+
+# -------------------------------------------------------------------
+# 5. REINICIAR SymmetricDS con AMBOS motores
+#    Ahora mysql-master tiene la configuracion lista y el registro
+#    abierto. postgres-replica arrancara, creara sus tablas sym_*
+#    en PostgreSQL, se registrara, y recibira la carga inicial.
+# -------------------------------------------------------------------
+echo "[5/5] Reiniciando SymmetricDS con AMBOS motores..."
 echo "==========================================="
 echo "  Replicacion MySQL -> PostgreSQL activa"
 echo "==========================================="
 
-# -------------------------------------------------------------------
-# Mantener vivo el proceso
-# -------------------------------------------------------------------
-wait $SYM_PID
+# exec reemplaza este proceso → Docker recibe senales correctamente
+exec $SYM_HOME/bin/sym --port 31415
