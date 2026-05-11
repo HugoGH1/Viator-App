@@ -202,6 +202,30 @@ services:
     networks:
       - viator-network
 
+  # ---------------------------------------------------------------------------
+  # Frontend Next.js (viatorFront) - Puerto 3001
+  # ---------------------------------------------------------------------------
+  viator-front:
+    build:
+      context: ./viatorFront
+      dockerfile: Dockerfile
+      args:
+        # El navegador del cliente necesita acceder a estas URLs,
+        # por lo que localhost apuntará a los puertos expuestos en la máquina host.
+        NEXT_PUBLIC_API_URL: "http://localhost:8080"
+        NEXT_PUBLIC_AUTH_API_URL: "http://localhost:3000"
+    container_name: viator_frontend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    depends_on:
+      viator-api:
+        condition: service_started
+      viatorapi-api:
+        condition: service_started
+    networks:
+      - viator-network
+
 # =============================================================================
 # Volúmenes nombrados - persisten datos aunque los contenedores se eliminen
 # =============================================================================

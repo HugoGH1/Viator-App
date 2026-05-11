@@ -6,7 +6,6 @@ Dockerfile
 .gitignore
 README.md
 dist
-bin
 obj
 .next
 .vscode
