@@ -83,6 +83,12 @@ services:
         condition: service_healthy
     networks:
       - viator-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:31415/sync/mysql-master || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
 
   # ---------------------------------------------------------------------------
   # Base de datos para el proyecto .NET (viatorAPI)
@@ -141,7 +147,7 @@ services:
       viator-postgres-read:
         condition: service_healthy
       viator-symmetricds:
-        condition: service_started
+        condition: service_healthy
     networks:
       - viator-network
 
