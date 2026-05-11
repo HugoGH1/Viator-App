@@ -41,12 +41,9 @@ export const QueryHandlers = [
     PrismaModule,
     CqrsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    JwtModule.registerAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '10m' },
-      }),
+    JwtModule.register({
+      secret: 'super-secreto-hardcodeado',
+      signOptions: { expiresIn: '1h' },
     }),
   ],
   providers: [

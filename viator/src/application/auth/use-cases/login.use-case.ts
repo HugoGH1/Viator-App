@@ -44,7 +44,7 @@ export class LoginUseCase {
       'tokenHash',
     );
     const payload = { sub: session.id, email: user.email };
-    const accessToken = this.jwtService.sign(payload);
+    const accessToken = this.jwtService.sign(payload, { secret: 'super-secreto-hardcodeado', expiresIn: '1h' });
     const tokenHash = this.tokenService.hash(accessToken);
 
     await this.sessionRepository.updateHash(session.id, tokenHash);
