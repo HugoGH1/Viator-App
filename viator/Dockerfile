@@ -48,9 +48,13 @@ EXPOSE 3000
 # -------------------------------------------------------------------
 # Startup automático
 #
-# 1. Esperar infraestructura
-# 2. Crear schema PostgreSQL replica
-# 3. Ejecutar migraciones MySQL
-# 4. Iniciar NestJS
+# 1. Gestionar migraciones MySQL (con soporte para baseline)
+#    SymmetricDS crea tablas sym_* antes de que Prisma arranque,
+#    lo que causa P3005 ("schema is not empty") en deploy limpio.
+#    El script detecta esto y hace baseline automáticamente.
+# 2. Iniciar NestJS
 # -------------------------------------------------------------------
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run start:dev"]
+COPY docker-entrypoint.sh ./
+RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
+
+CMD ["./docker-entrypoint.sh"]
