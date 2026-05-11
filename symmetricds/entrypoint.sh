@@ -61,10 +61,14 @@ wait_for_postgres
 
 # -------------------------------------------------------------------
 # 4. Iniciar SymmetricDS como proceso UNICO (foreground)
-#    Carga TODOS los engines de /opt/symmetric-ds/engines/
 #    Lo lanzamos en background para poder seguir con el script
 # -------------------------------------------------------------------
-echo "[3/6] Iniciando SymmetricDS (proceso unico multi-engine)..."
+echo "[3/6] Iniciando SymmetricDS (mysql-master engine)..."
+
+# Evitar que postgres-replica inicie hasta que la configuracion este lista
+if [ -f "$SYM_HOME/engines/postgres-replica.properties" ]; then
+  mv $SYM_HOME/engines/postgres-replica.properties $SYM_HOME/postgres-replica.properties.staged
+fi
 
 $SYM_HOME/bin/sym \
   --port 31415 &
@@ -146,6 +150,13 @@ if [ "$CONFIGURED" = "0" ]; then
   $SYM_HOME/bin/symadmin \
     --engine mysql-master \
     open-registration replica replica-001
+    
+  echo "  Registro abierto. Iniciando motor postgres-replica..."
+  
+  # Restaurar y arrancar el motor de replica (SymmetricDS lo detectara automaticamente)
+  if [ -f "$SYM_HOME/postgres-replica.properties.staged" ]; then
+    mv $SYM_HOME/postgres-replica.properties.staged $SYM_HOME/engines/postgres-replica.properties
+  fi
 
   # Esperar a que el nodo replica se registre
   echo "  Esperando registro del nodo replica (30s)..."
@@ -159,7 +170,10 @@ if [ "$CONFIGURED" = "0" ]; then
 
   echo "  Carga inicial enviada."
 else
-  echo "[5/6] Configuracion ya existente, omitiendo."
+  echo "[5/6] Configuracion ya existente, asegurando que replica este corriendo."
+  if [ -f "$SYM_HOME/postgres-replica.properties.staged" ]; then
+    mv $SYM_HOME/postgres-replica.properties.staged $SYM_HOME/engines/postgres-replica.properties
+  fi
 fi
 
 echo "[6/6] SymmetricDS listo y replicando."
